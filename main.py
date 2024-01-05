@@ -4,7 +4,6 @@ from random import choice, random, randint
 from os import path
 from settings import *
 from sprites import *
-from tilemap import *
 
 
 class Game:
@@ -16,6 +15,7 @@ class Game:
         self.font_name = pg.font.match_font(FONT_NAME)
         self.clock = pg.time.Clock()
         self.load_data()
+        
         self.FPS = FPS
         self.dalitaj = 1000.0
 
@@ -32,16 +32,34 @@ class Game:
         self.dim_screen = pg.Surface(self.screen.get_size()).convert_alpha()
         self.dim_screen.fill((0, 0, 0, 180))
 
+    def setup_tutorial_keys(self):
+        keys_info = [
+            ("esc", "Iziet no spēles"), 
+            ("shift", "Izmantot dzinēju"),
+            ("mouse", "Tēmēt kustību"),
+            ("p", "Pauzēt spēli")
+        ]
+        x, y = 100, ekgar - 300 
+        for key, description in keys_info:
+            TutorialKey(self, x, y, 150, 50, key, description)  
+            y -= 80 
+
+
     def new(self):
         self.all_sprites = pg.sprite.LayeredUpdates()
         self.walls = pg.sprite.Group()
+        self.tutorial_keys = pg.sprite.Group()
+        self.mana_blobs = pg.sprite.Group()
         self.items = pg.sprite.Group()
         self.particles = pg.sprite.Group()
         self.main_particles = pg.sprite.Group()
         self.player = Player(self, ekplat / 2, ekgar / 2)
         self.draw_debug = False
         self.paused = False
+        self.mana_index = 1
 
+        self.setup_tutorial_keys()
+    
     def run(self):
         self.playing = True
         while self.playing:
@@ -56,13 +74,16 @@ class Game:
         #     for yy in range(h):
         #         Obstacle(self, x + xx, y + yy, 1, 1)
         Obstacle(self, x, y, w, h)
+    def createManaBlob(self, x, y, w, h):
+
+        ManaBlob(self, x, y, w, h)
 
     def quit(self):
         pg.quit()
         sys.exit()
 
     def update(self):
-        print(len(self.particles))
+        # print(len(self.particles))
         self.all_sprites.update()
         if self.player.mana < 0:
             self.player.gas = False
@@ -71,6 +92,11 @@ class Game:
         if self.player.gas == False:
             if self.player.mana < PLAYER_MANA:
                 self.player.mana += ADD_MANA_SPEED
+
+        mana_hits = pg.sprite.spritecollide(self.player, self.mana_blobs, True)
+        for mana_blob in mana_hits:
+            print(ADD_MANA_SPEED)
+            self.player.mana += ADD_MANA
 
         # if self.player.pos.x > ekplat - ekplat / 6:
         #     for obs in self.walls:
@@ -93,36 +119,48 @@ class Game:
         #         part.pos.y -= self.player.vel.y
         #     self.player.pos.y -= self.player.vel.y
         #     self.player.atNoCentra.y -= self.player.vel.y
-        if self.player.pos.y < ekgar / 4:
+        
+        # spēlētajs cenšas uziet uz augšu
+        if self.player.pos.y < ekgar / 3:
             self.player.pos.y -= self.player.vel.y
-            for obs in self.walls:
-                obs.rect.y += abs(self.player.vel.y)
-                if obs.rect.top >= ekgar:
-                    obs.kill()
+            groups = [self.walls, self.tutorial_keys, self.mana_blobs]
+            for group in groups:
+                for obs in group:
+                    obs.rect.y += abs(self.player.vel.y)
+                    if obs.rect.top >= ekgar:
+                        obs.kill()
             for part in self.main_particles:
                 part.pos.y -= self.player.vel.y
-        while len(self.walls) < 10:
-            width = randint(5, 100)
-            height = randint(5, 100)
+        while len(self.walls) < 15:
+            size = randint(30, 80)
+            width = size + randint(-10, 80)
+            height = size + randint(-20, 20)
             pposx = round(self.player.pos.x)
             pposy = round(self.player.pos.y)
             x = randint(0, ekplat - width)
-            y = randint(-1000, -30)
+            y = randint(-ekgar * 2, -10)
             self.createObstacle(x, y, width, height)
+
+        while len(self.mana_blobs) < 4:
+            x = randint(0, ekplat - 20)
+            y = (-ekgar / 1) * self.mana_index
+            self.mana_index += 1
+            self.createManaBlob(x, y, 20, 20)
+            print(x, y)
     # HUD
     def draw_player_mana(self, surf, x, y, pct):
         if pct < 0:
             pct = 0
         if pct > 1:
             pct = 1
-        BAR_LENGTH = ekplat
+        BAR_LENGTH = ekplat / 2
         BAR_HEIGHT = 20
         fill = pct * BAR_LENGTH
         outline_rect = pg.Rect(x, y, BAR_LENGTH, BAR_HEIGHT)
         fill_rect = pg.Rect(x, y, fill, BAR_HEIGHT)
         col = (255 * (1 - pct), 255 * pct, 0)
         pg.draw.rect(surf, col, fill_rect)
-        #pg.draw.rect(surf, WHITE, outline_rect, 2)
+        pg.draw.rect(surf, DARKGREY, outline_rect, 2)
     
     def draw(self):
         pg.display.set_caption("{:.2f}".format(self.clock.get_fps()))
@@ -136,7 +174,7 @@ class Game:
                 pg.draw.rect(self.screen, CYAN, wall.rect, 1)
 
         # HUD functions
-        self.draw_player_mana(self.screen, 0, 20, self.player.mana / PLAYER_MANA)
+        self.draw_player_mana(self.screen, 20, 20, self.player.mana / PLAYER_MANA)
         if self.paused:
             self.screen.blit(self.dim_screen, (0, 0))
             self.draw_text("Paused", 105, WHITE, ekplat / 2, ekgar / 2)

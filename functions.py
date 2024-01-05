@@ -2,6 +2,9 @@ from math import sin, cos, pi, atan2, hypot, sqrt
 import math
 import random
 
+def collide_hit_rect(one, two):
+    return one.hit_rect.colliderect(two.rect)
+
 def get_line(start, end):
     """Bresenham's Line Algorithm
     Produces a list of tuples from start and end

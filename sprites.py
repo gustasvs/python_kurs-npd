@@ -1,8 +1,8 @@
 import pygame as pg
 from random import uniform, choice, randint, random
+from os import path
 from settings import *
 from functions import *
-from tilemap import collide_hit_rect
 import pytweening as tween
 from math import sin, cos, pi, atan2, hypot
 vec = pg.math.Vector2
@@ -128,6 +128,11 @@ class ParticleBoosting(pg.sprite.Sprite):
             self.kill()
         self.pos += self.vel + 0.5 * self.acc
         self.hit_rect.centerx = self.pos.x
+        # hits = pg.sprite.spritecollide(self, self.game.walls, False)
+        # for hit in hits:
+        #     hit.create_hole(self.pos)
+        #     self.kill() 
+        
         self.collide_with_walls(self, self.game.walls, 'x')
         self.hit_rect.centery = self.pos.y
         self.collide_with_walls(self, self.game.walls, 'y')
@@ -141,6 +146,8 @@ class ParticleBoosting(pg.sprite.Sprite):
         #         self.image = pg.transform.scale(self.image, (ex, ey))
         if now - self.spawn_time > self.lifetime:
             self.kill()
+
+        
 
     def collide_with_walls(self, sprite, group, dir):
         if dir == 'x':
@@ -214,4 +221,75 @@ class Obstacle(pg.sprite.Sprite):
         self.y = y
         self.rect.x = x
         self.rect.y = y
+
+        # self.hitboxes = []
+        # for ix in range(w):
+        #     for iy in range(h):
+        #         hitbox = pg.Rect(x + ix, y + iy, 1, 1)
+        #         self.hitboxes.append(hitbox)
+
+    def update(self):
+        self.y += 1
+        self.rect.y += 1
+    def create_hole(self, pos):
+        # Convert global position to local position on the obstacle
+        local_pos = (int(pos[0] - self.rect.x), int(pos[1] - self.rect.y))
+        # Create a 1-pixel hole
+        self.image.set_at(local_pos, pg.Color("white"))
+
+class ManaBlob(pg.sprite.Sprite):
+    def __init__(self, game, x, y, w, h):
+        self.groups = game.mana_blobs, game.all_sprites
+        pg.sprite.Sprite.__init__(self, self.groups)
+        self.game = game
+        self.rect = pg.Rect(x, y, w, h)
+        self.image = pg.Surface((w, h))
+        self.image.fill(CYAN)
+        self.rect = self.image.get_rect()
+        self.hit_rect = self.rect
+        self.x = x
+        self.y = y
+        self.rect.x = x
+        self.rect.y = y
+
+class TutorialKey(pg.sprite.Sprite):
+    def __init__(self, game, x, y, w, h, key, description):
+        self.groups = game.tutorial_keys, game.all_sprites
+        pg.sprite.Sprite.__init__(self, self.groups)
+        self.game = game
+        self.text_offset = w
+        self.rect = pg.Rect(x, y, w * 3, h)
+        self.key = key
+        self.description = description
+
+        img_path = path.join('img', f"{key}_key.png")
+        if path.exists(img_path):
+            image = pg.image.load(img_path)
+            image = pg.transform.scale(image, (w, h))
+            image_w, image_h = image.get_size()
+            self.image = pg.Surface((image_w * 2 + self.text_offset, h))
+            self.image.fill(CYAN)
+            self.image.blit(image, (0, 0))
+            self.text_offset = image_w
+        else:
+            self.image = pg.Surface((w * 3, h))
+            self.image.fill(CYAN)
+
+        self.draw_key_text()
+
+        self.rect = self.image.get_rect()
+        self.hit_rect = self.rect
+        self.rect.x = x
+        self.rect.y = y
+
+    def draw_key_text(self):
+        text = f"{self.key}: {self.description}"
+        font = pg.font.Font(self.game.font_name, 25)
+        text_surface = font.render(text, True, BLACK)
+        text_rect = text_surface.get_rect(center=(self.text_offset + (self.rect.w - self.text_offset) / 2, self.rect.h / 2))
+        self.image.blit(text_surface, text_rect)
+    
+    def update(self):
+        self.rect.y += 1
+
 
