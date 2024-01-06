@@ -12,6 +12,7 @@ BROWN = (106, 55, 5)
 CYAN = (0, 255, 255)
 MELNS = (0, 0, 0)
 FONT_NAME = 'GROBOLD'
+OBSTACLE_COUNT = 3
 
 # game settings
 ekplat = 576   # 16 * 64 or 32 * 32 or 64 * 16
@@ -28,7 +29,7 @@ GRIDHEIGHT = ekgar / TILESIZE
 
 WALL_IMG = 'tileGreen_39.png'
 PARTICLE_IMG = 'Particle.png'
-PARTICLE_LIFETIME = 10000
+PARTICLE_LIFETIME = 2000
 
 # Player settings
 PLAYER_MANA = 800

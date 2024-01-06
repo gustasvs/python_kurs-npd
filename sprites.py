@@ -47,7 +47,8 @@ class Player(pg.sprite.Sprite):
         else:
             self.acc = vec(0, 0)
             self.gravity = 0
-        self.acc.y += self.gravity
+        if self.game.started:
+            self.acc.y += self.gravity
         self.acc += self.vel * PLAYER_FRICTION
         self.vel += self.acc
         if abs(self.vel.x) < 0.4:
@@ -91,12 +92,71 @@ class Player(pg.sprite.Sprite):
                 sprite.vel.y = 0
                 sprite.hit_rect.centery = sprite.pos.y
 
+class Segment:
+    # Represents an obstacle in the game
+    def __init__(self, p1, p2):
+        self.p1 = p1
+        self.p2 = p2
+
+    def intersects(self, ray):
+        # Implement intersection logic between a ray and this segment
+        pass
+
+class Ray(pg.sprite.Sprite):
+    def __init__(self, origin, angle, length=200, color=CYAN):
+        super().__init__()
+        self.image = pg.Surface([length, 2], pg.SRCALPHA)  # Create a transparent surface
+        self.image.fill(color) 
+        self.rect = self.image.get_rect()
+        self.origin = origin
+        self.angle = angle
+        self.length = length
+        self.max_length = length
+        self.update()
+
+    def update(self):
+        end_point = pg.Vector2(math.cos(self.angle), math.sin(self.angle)) * self.length
+        self.rect.x, self.rect.y = self.origin
+        self.image = pg.transform.rotate(self.image, -math.degrees(self.angle))
+        self.rect = self.image.get_rect(center=(self.origin[0] + end_point.x / 2, self.origin[1] + end_point.y / 2))
+
+    def get_endpoint(self):
+        end_point = pg.Vector2(math.cos(self.angle), math.sin(self.angle)) * self.length
+        return self.origin + end_point
+
+    # def calculate_intersection(self, edge):
+    #     # Edge is defined by two points (start and end)
+    #     edge_start, edge_end = edge
+
+    #     # Ray direction
+    #     ray_dir = pg.Vector2(math.cos(self.angle), math.sin(self.angle))
+
+    #     # Find vectors
+    #     v1 = self.origin - pg.Vector2(edge_start)
+    #     v2 = pg.Vector2(edge_end) - pg.Vector2(edge_start)
+    #     v3 = pg.Vector2(-ray_dir.y, ray_dir.x)
+
+    #     # Check if the ray and the edge are parallel
+    #     dot = v2.dot(v3)
+    #     if abs(dot) < 1e-10:
+    #         return None  # They are parallel so they don't intersect
+
+    #     # Calculate the t and u parameters to find the intersection point
+    #     t = v2.cross(v1) / dot
+    #     u = v1.dot(v3) / dot
+
+    #     # Check if the intersection is on the edge and on the ray
+    #     if 0 <= u <= 1 and t >= 0:
+    #         intersection = self.origin + t * ray_dir
+    #         return intersection
+    #     return None
+
 
 class ParticleBoosting(pg.sprite.Sprite):
     def __init__(self, game, pos, rot):
         pg.sprite.Sprite.__init__(self, (game.all_sprites, game.particles))
         self.game = game
-        self.image = pg.Surface((1, 1))
+        self.image = pg.Surface((2, 2))
         self.image.fill(MELNS)
         self.rect = self.image.get_rect()
         self.pos = vec(pos)
@@ -206,7 +266,6 @@ class ParticleMain(pg.sprite.Sprite):
             self.kill()
         self.rect.center = self.pos
 
-
 class Obstacle(pg.sprite.Sprite):
     def __init__(self, game, x, y, w, h):
         self.groups = game.walls, game.all_sprites
@@ -222,15 +281,21 @@ class Obstacle(pg.sprite.Sprite):
         self.rect.x = x
         self.rect.y = y
 
-        # self.hitboxes = []
-        # for ix in range(w):
-        #     for iy in range(h):
-        #         hitbox = pg.Rect(x + ix, y + iy, 1, 1)
-        #         self.hitboxes.append(hitbox)
-
     def update(self):
-        self.y += 1
-        self.rect.y += 1
+        if self.game.started:
+            self.rect.y += 1
+
+    def get_corners(self):
+        if self.rect.y < 0 or self.rect.y > ekgar:
+            return []
+        corners = [
+            (self.rect.topleft),
+            (self.rect.topright),
+            (self.rect.bottomleft),
+            (self.rect.bottomright)
+        ]
+        return corners
+
     def create_hole(self, pos):
         # Convert global position to local position on the obstacle
         local_pos = (int(pos[0] - self.rect.x), int(pos[1] - self.rect.y))
@@ -245,6 +310,21 @@ class ManaBlob(pg.sprite.Sprite):
         self.rect = pg.Rect(x, y, w, h)
         self.image = pg.Surface((w, h))
         self.image.fill(CYAN)
+        self.rect = self.image.get_rect()
+        self.hit_rect = self.rect
+        self.x = x
+        self.y = y
+        self.rect.x = x
+        self.rect.y = y
+
+class TmpPoint(pg.sprite.Sprite):
+    def __init__(self, game, x, y, w, h):
+        self.groups = game.tmp_points, game.all_sprites
+        pg.sprite.Sprite.__init__(self, self.groups)
+        self.game = game
+        self.rect = pg.Rect(x, y, w, h)
+        self.image = pg.Surface((w, h))
+        self.image.fill(RED)
         self.rect = self.image.get_rect()
         self.hit_rect = self.rect
         self.x = x
@@ -290,6 +370,7 @@ class TutorialKey(pg.sprite.Sprite):
         self.image.blit(text_surface, text_rect)
     
     def update(self):
-        self.rect.y += 1
+        if self.game.started:
+            self.rect.y += 1
 
 

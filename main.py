@@ -5,7 +5,6 @@ from os import path
 from settings import *
 from sprites import *
 
-
 class Game:
     def __init__(self):
         pg.init()
@@ -48,6 +47,8 @@ class Game:
     def new(self):
         self.all_sprites = pg.sprite.LayeredUpdates()
         self.walls = pg.sprite.Group()
+        self.rays = pg.sprite.Group()
+        self.tmp_points = pg.sprite.Group()
         self.tutorial_keys = pg.sprite.Group()
         self.mana_blobs = pg.sprite.Group()
         self.items = pg.sprite.Group()
@@ -56,6 +57,7 @@ class Game:
         self.player = Player(self, ekplat / 2, ekgar / 2)
         self.draw_debug = False
         self.paused = False
+        self.started = False
         self.mana_index = 1
 
         self.setup_tutorial_keys()
@@ -83,8 +85,89 @@ class Game:
         sys.exit()
 
     def update(self):
-        # print(len(self.particles))
         self.all_sprites.update()
+        self.rays.empty()  
+        self.tmp_points.empty()
+
+        for wall in self.walls:
+            for corner in wall.get_corners():
+                intersections = 0
+                hit_same_object_again = False
+
+                for other_wall in self.walls:
+                    edges = [ # objekta visas sienas
+                        (other_wall.rect.topleft, other_wall.rect.topright),
+                        (other_wall.rect.topright, other_wall.rect.bottomright),
+                        (other_wall.rect.bottomright, other_wall.rect.bottomleft),
+                        (other_wall.rect.bottomleft, other_wall.rect.topleft)
+                    ]
+                    # vai ar kādu no sienām saskaras
+                    for edge_start, edge_end in edges:
+                        if do_intersect(self.player.pos, corner, edge_start, edge_end):
+                            intersections += 1
+                            break
+                    if intersections > 1:
+                        break
+
+                hit_same_object_again = count_intersections_with_wall(self.player.pos, corner, wall)
+                
+                angle_to_corner = math.atan2(corner[1] - self.player.pos[1], corner[0] - self.player.pos[0])
+                color = CYAN
+                if hit_same_object_again:
+                    color = BLACK
+
+                extended_side = get_extended_ray_side(self.player.pos, corner, wall)
+                angle_offset = math.radians(0.01) if extended_side == 1 else -math.radians(0.01)
+
+                if intersections == 0:
+                    distance = math.hypot(corner[0] - self.player.pos[0], corner[1] - self.player.pos[1])
+                    if not hit_same_object_again:
+                        # ray = Ray(self.player.pos, angle_to_corner - math.radians(0.01), distance, color)
+                        # self.rays.add(ray)
+                        ray2 = Ray(self.player.pos, angle_to_corner - angle_offset, distance, color)
+                        self.rays.add(ray2)
+                    else:
+                        ray = Ray(self.player.pos, angle_to_corner, distance, color)
+                        self.rays.add(ray)
+
+                if  intersections == 0 and not hit_same_object_again:
+                    extended_distance = calculate_distance_to_map_boundary(self.player.pos, angle_to_corner, self.walls)                    
+                    # extended_ray = Ray(self.player.pos, angle_to_corner + math.radians(0.01), extended_distance)
+                    # self.rays.add(extended_ray)
+                    extended_ray_2 = Ray(self.player.pos, angle_to_corner , extended_distance, color)
+                    self.rays.add(extended_ray_2)
+
+        map_corners = [
+            (0, 0),
+            (ekplat, 0),
+            (ekplat, ekgar),
+            (0, ekgar)
+        ]
+
+        for map_corner in map_corners:
+            intersections = 0
+            angle_to_corner = math.atan2(map_corner[1] - self.player.pos[1], map_corner[0] - self.player.pos[0])
+
+            for wall in self.walls:
+                edges = [
+                    (wall.rect.topleft, wall.rect.topright),
+                    (wall.rect.topright, wall.rect.bottomright),
+                    (wall.rect.bottomright, wall.rect.bottomleft),
+                    (wall.rect.bottomleft, wall.rect.topleft)
+                ]
+
+                for edge_start, edge_end in edges:
+                    if do_intersect(self.player.pos, map_corner, edge_start, edge_end):
+                        intersections += 1
+                        break  # If one wall intersects, no need to check others
+
+            # If there are no intersections, add a ray to the map corner
+            if intersections == 0:
+                distance_to_corner = math.hypot(map_corner[0] - self.player.pos[0], map_corner[1] - self.player.pos[1])
+                ray_to_corner = Ray(self.player.pos, angle_to_corner, distance_to_corner)
+                self.rays.add(ray_to_corner)
+
+
         if self.player.mana < 0:
             self.player.gas = False
         if self.player.gas == True:
@@ -98,6 +181,7 @@ class Game:
             print(ADD_MANA_SPEED)
             self.player.mana += ADD_MANA
 
+        # uz citam psuem ne tikai augšu
         # if self.player.pos.x > ekplat - ekplat / 6:
         #     for obs in self.walls:
         #         obs.rect.x -= self.player.vel.x
@@ -131,7 +215,7 @@ class Game:
                         obs.kill()
             for part in self.main_particles:
                 part.pos.y -= self.player.vel.y
-        while len(self.walls) < 15:
+        while len(self.walls) < OBSTACLE_COUNT:
             size = randint(30, 80)
             width = size + randint(-10, 80)
             height = size + randint(-20, 20)
@@ -166,6 +250,26 @@ class Game:
         pg.display.set_caption("{:.2f}".format(self.clock.get_fps()))
         self.screen.fill(BGCOLOR)
         self.all_sprites.draw(self.screen)
+        self.rays.draw(self.screen)
+
+        visibility_polygon = []
+        sorted_rays = sorted(self.rays, key=lambda ray: (ray.angle, ray.length))
+        for ray in sorted_rays:
+            endpoint = ray.get_endpoint()
+            visibility_polygon.append(endpoint)
+        if visibility_polygon:
+            try:
+                visibility_surface = pg.Surface((ekplat, ekgar), pg.SRCALPHA)
+                visibility_surface.fill((0, 0, 0, 0))  # Fill with transparent color
+
+                # Draw the polygon on the transparent surface
+                pg.draw.polygon(visibility_surface, (100, 100, 0, 128), visibility_polygon)
+
+                # Blit this surface onto the main screen
+                self.screen.blit(visibility_surface, (0, 0))
+            except:
+                pass
+            
         if self.draw_debug:
             for sprite in self.all_sprites:
                 if sprite not in self.particles:
@@ -193,6 +297,7 @@ class Game:
                     self.paused = not self.paused
             if event.type == pg.KEYDOWN:
                 if event.key == pg.K_LSHIFT:
+                    self.started = True
                     self.player.gas = True
             if event.type == pg.KEYUP:
                 if event.key == pg.K_LSHIFT:
