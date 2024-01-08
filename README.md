@@ -31,6 +31,7 @@ player_stats.json saglabā spēlētāja informāciju, ja programma tiek aizvērt
 
 ## TODO
 Lietas kuras nav izdarītas laika trūkuma dēļ:
+* izdomāt īsu programmas nosaukumu, pagaidām speles windows logā ir attēlots cik reizes sekundē tike atjaunota (FPS)
 * Ir redzami objekti, kuri atrodas aiz citiem objektiem
 * Spēlētāja kopējā nauda saglabājas spēli aizverot, taču nesaglabājas veiktie uzlabojumi
 * Uzlaboti komentāri
