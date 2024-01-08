@@ -5,6 +5,21 @@ from settings import *
 import json
 
 
+def calculate_centroid(points):
+    x_sum, y_sum = 0, 0
+    for (x, y) in points:
+        x_sum += x
+        y_sum += y
+    return x_sum / len(points), y_sum / len(points)
+
+def sort_points(points):
+    centroid = calculate_centroid(points)
+
+    def sort_key(point):
+        return math.atan2(point[1] - centroid[1], point[0] - centroid[0])
+
+    return sorted(points, key=sort_key)
+
 def check_wall_collisions(self):
         for wall in self.game.walls:
             if wall != self and self.rect.colliderect(wall.rect):
@@ -94,7 +109,6 @@ def calculate_distance_to_map_boundary(player_pos, angle, walls, current_wall):
     # Player position
     px, py = player_pos
 
-    max_distance = calculate_max_distance_to_corners(px, py, map_right, map_bottom)
     # Ray direction
     dx = math.cos(angle) 
     dy = math.sin(angle) 
@@ -102,25 +116,26 @@ def calculate_distance_to_map_boundary(player_pos, angle, walls, current_wall):
     # Initialize distances to be a large number
     distances = []
     hit = True
-    # Calculate intersections with walls
-    for wall in walls:
-        if wall != current_wall:
-            edges = [
-                (wall.rect.topleft, wall.rect.topright),
-                (wall.rect.topright, wall.rect.bottomright),
-                (wall.rect.bottomright, wall.rect.bottomleft),
-                (wall.rect.bottomleft, wall.rect.topleft)
-            ]
+    
+    # # Calculate intersections with walls
+    # for wall in walls:
+    #     if wall != current_wall:
+    #         edges = [
+    #             (wall.rect.topleft, wall.rect.topright),
+    #             (wall.rect.topright, wall.rect.bottomright),
+    #             (wall.rect.bottomright, wall.rect.bottomleft),
+    #             (wall.rect.bottomleft, wall.rect.topleft)
+    #         ]
             
-            for edge_start, edge_end in edges:
-                intersection = get_intersection(player_pos, (px + dx * max_distance, py + dy * max_distance), edge_start, edge_end)
-                if intersection is not None:
-                    distances.append(math.hypot(intersection[0] - px, intersection[1] - py))
-                    # print(f"Hit object at angle: {math.degrees(angle)}")
-                    hit = False
-                    # print(math.hypot(wall.rect.right - px, wall.rect.top - py))
-    # Check intersection with each of the four boundaries
-    # Left boundary
+    #         for edge_start, edge_end in edges:
+    #             intersection = get_intersection(player_pos, (px + dx * max_distance, py + dy * max_distance), edge_start, edge_end)
+    #             if intersection is not None:
+    #                 distances.append(math.hypot(intersection[0] - px, intersection[1] - py))
+    #                 # print(f"Hit object at angle: {math.degrees(angle)}")
+    #                 hit = False
+    #                 # print(math.hypot(wall.rect.right - px, wall.rect.top - py))
+    # # Check intersection with each of the four boundaries
+    # # Left boundary
     # if hit:
         # print(f"did NOT hit an object at angle: {math.degrees(angle)}")
     if dx < 0:

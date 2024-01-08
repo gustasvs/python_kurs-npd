@@ -1,9 +1,8 @@
 import pygame as pg
-from random import uniform, choice, randint, random
+from random import choice, randint, random
 from os import path
 from settings import *
 from functions import *
-import pytweening as tween
 from math import sin, cos, pi, atan2, hypot
 vec = pg.math.Vector2
 
@@ -362,6 +361,7 @@ class Obstacle(pg.sprite.Sprite):
         self.y = y
         self.rect.x = x
         self.rect.y = y
+        self.seen = False
 
         direction = random.choice([(1, 0), (0, 1), (-1, 0), (0, -1)])
         while check_wall_collisions(self):
@@ -371,6 +371,12 @@ class Obstacle(pg.sprite.Sprite):
     def update(self):
         if self.game.started and not self.game.paused and not self.game.ended:
             self.rect.y += 1
+        self.seen = False
+        # self.image.fill((255, 255, 255))
+        if not self.seen:
+            self.image.set_alpha(0)  # Fully transparent
+        else:
+            self.image.set_alpha(255) 
 
     def get_corners(self):
         if self.rect.bottom < -10 or self.rect.top > ekgar:
@@ -382,6 +388,10 @@ class Obstacle(pg.sprite.Sprite):
             (self.rect.bottomright)
         ]
         return corners
+    def set_seen(self):
+        self.seen = True
+        self.image.set_alpha(255)
+
 
 class ManaBlob(pg.sprite.Sprite):
     def __init__(self, game, x, y, w, h):
@@ -488,7 +498,13 @@ class UpgradeButton(pg.sprite.Sprite):
         self.image_normal.blit(image, (0, 20))
         
         self.draw_text(self.image_normal, f"{self.short_desc}", (10, h + 20), MELNS, 30)
-        self.draw_text(self.image_normal, f"{self.game.player_stats[self.player_field]}", (10, 0), MELNS, 37)
+        value = self.game.player_stats[self.player_field]
+
+        if isinstance(value, float):
+            formatted_value = f"{value:.1f}"
+        elif isinstance(value, int):
+            formatted_value = str(value)
+        self.draw_text(self.image_normal, f"{formatted_value}", (10, 0), MELNS, 37)
         
         #hover
         self.image_hover = pg.Surface((w + text_area_height, h + text_area_height), pg.SRCALPHA)
