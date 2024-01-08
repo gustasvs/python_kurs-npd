@@ -7,7 +7,10 @@ git clone https://github.com/gustasvs/python_kurs-npd
 cd python_kurs-npd
 pip install -r requirements.txt
 ```
-Projekta bāzes folderī japalaiž fails ```main.py```
+Lai palaistu projekta bāzes folderī palaist:
+```bash
+python3 main.py
+```
 
 ## Par darbu
 Darbu veidoja Gustavs Jākobsons, gj22014
