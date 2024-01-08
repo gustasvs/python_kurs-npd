@@ -2,7 +2,14 @@ from math import sin, cos, pi, atan2, hypot, sqrt
 import math
 import random
 from settings import *
+import json
 
+
+def check_wall_collisions(self):
+        for wall in self.game.walls:
+            if wall != self and self.rect.colliderect(wall.rect):
+                return True
+        return False
 
 def get_extended_ray_side(player_pos, corner, wall):
     # Get all corners and find the indices for shared_edge
@@ -65,54 +72,57 @@ def get_edge_containing_corner(corner, edges):
             return edge
     return None
 
-def calculate_ray_end_position(start_pos, angle, walls):
-    # Calculate the direction vector components of the ray
-    dx = math.cos(angle)
-    dy = math.sin(angle)
 
-    # Calculate the distance to the map boundary
-    distance_to_boundary = calculate_distance_to_map_boundary(start_pos, angle, walls)
+def calculate_max_distance_to_corners(px, py, map_right, map_bottom):
+    distances_to_corners = [
+        math.hypot(px, py),  # distance to top-left corner (0, 0)
+        math.hypot(map_right - px, py),  # distance to top-right corner
+        math.hypot(px, map_bottom - py),  # distance to bottom-left corner
+        math.hypot(map_right - px, map_bottom - py)  # distance to bottom-right corner
+    ]
+    return max(distances_to_corners)
 
-    # Calculate the end position of the ray
-    end_x = start_pos[0] + dx * distance_to_boundary
-    end_y = start_pos[1] + dy * distance_to_boundary
-
-    return (end_x, end_y)
-
-
-
-def calculate_distance_to_map_boundary(player_pos, angle, walls):
+def calculate_distance_to_map_boundary(player_pos, angle, walls, current_wall):
     # Map boundaries
+
     map_left = 0
     map_top = 0
     map_right = ekplat
     map_bottom = ekgar
 
+
     # Player position
     px, py = player_pos
 
+    max_distance = calculate_max_distance_to_corners(px, py, map_right, map_bottom)
     # Ray direction
-    dx = math.cos(angle)
-    dy = math.sin(angle)
+    dx = math.cos(angle) 
+    dy = math.sin(angle) 
 
     # Initialize distances to be a large number
     distances = []
-
+    hit = True
     # Calculate intersections with walls
     for wall in walls:
-        edges = [
-            (wall.rect.topleft, wall.rect.topright),
-            (wall.rect.topright, wall.rect.bottomright),
-            (wall.rect.bottomright, wall.rect.bottomleft),
-            (wall.rect.bottomleft, wall.rect.topleft)
-        ]
-        for edge_start, edge_end in edges:
-            intersection = do_intersect(player_pos, (px + dx, py + dy), edge_start, edge_end)
-            if intersection:
-                distances.append(math.hypot(intersection[0] - px, intersection[1] - py))
-
+        if wall != current_wall:
+            edges = [
+                (wall.rect.topleft, wall.rect.topright),
+                (wall.rect.topright, wall.rect.bottomright),
+                (wall.rect.bottomright, wall.rect.bottomleft),
+                (wall.rect.bottomleft, wall.rect.topleft)
+            ]
+            
+            for edge_start, edge_end in edges:
+                intersection = get_intersection(player_pos, (px + dx * max_distance, py + dy * max_distance), edge_start, edge_end)
+                if intersection is not None:
+                    distances.append(math.hypot(intersection[0] - px, intersection[1] - py))
+                    # print(f"Hit object at angle: {math.degrees(angle)}")
+                    hit = False
+                    # print(math.hypot(wall.rect.right - px, wall.rect.top - py))
     # Check intersection with each of the four boundaries
     # Left boundary
+    # if hit:
+        # print(f"did NOT hit an object at angle: {math.degrees(angle)}")
     if dx < 0:
         distances.append((map_left - px) / dx)
     # Right boundary
@@ -130,6 +140,7 @@ def calculate_distance_to_map_boundary(player_pos, angle, walls):
 
     # Convert distance to vector length if not already
     distance_to_boundary_or_wall = min_distance
+    # print(distances)
     return distance_to_boundary_or_wall
 
 
@@ -144,19 +155,39 @@ def do_intersect(p1, q1, p2, q2):
 
     if not on_same_side(p1, q1, p2, q2) and not on_same_side(p2, q2, p1, q1):
         return True
-    
-    # def point_on_segment(p, a, b):
-    #     # Check if point p is on line segment ab
-    #     minx = min(a[0], b[0])
-    #     maxx = max(a[0], b[0])
-    #     miny = min(a[1], b[1])
-    #     maxy = max(a[1], b[1])
-    #     return minx <= p[0] <= maxx and miny <= p[1] <= maxy and on_same_side(p, p, a, b)
-
-    # if point_on_segment(p2, p1, q1) or point_on_segment(q2, p1, q1):
-    #     return True
 
     return False
+
+def get_intersection(p1, q1, p2, q2):
+    # Function to calculate the determinant
+    def det(a, b, c, d):
+        return a * d - b * c
+
+    # Calculate the parts of the line equations
+    a1, b1 = q1[1] - p1[1], p1[0] - q1[0]
+    c1 = a1 * p1[0] + b1 * p1[1]
+    a2, b2 = q2[1] - p2[1], p2[0] - q2[0]
+    c2 = a2 * p2[0] + b2 * p2[1]
+
+    # Calculate the determinant
+    delta = det(a1, b1, a2, b2)
+
+    # If the determinant is zero, lines are parallel or coincident
+    if delta == 0:
+        return None
+
+    # Find the intersection point
+    x = det(c1, b1, c2, b2) / delta
+    y = det(a1, c1, a2, c2) / delta
+
+    # Check if the intersection point lies within both line segments
+    if (min(p1[0], q1[0]) <= x <= max(p1[0], q1[0]) and
+        min(p1[1], q1[1]) <= y <= max(p1[1], q1[1]) and
+        min(p2[0], q2[0]) <= x <= max(p2[0], q2[0]) and
+        min(p2[1], q2[1]) <= y <= max(p2[1], q2[1])):
+        return (x, y)
+
+    return None
 
 
 def collide_hit_rect(one, two):
@@ -241,3 +272,16 @@ def randomInCircle(pos, radius):
     x = r * cos(alpha) + circle_x
     y = r * sin(alpha) + circle_y
     return (x, y)
+
+
+def save_player_stats(player_stats, filename='player_stats.json'):
+    with open(filename, 'w') as file:
+        json.dump(player_stats, file)
+
+def load_player_stats(filename='player_stats.json'):
+    try:
+        with open(filename, 'r') as file:
+            player_stats = json.load(file)
+        return player_stats
+    except:
+        return None
